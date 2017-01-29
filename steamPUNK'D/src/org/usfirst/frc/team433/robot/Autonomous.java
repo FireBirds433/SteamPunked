@@ -1,7 +1,11 @@
 package org.usfirst.frc.team433.robot;
 
+import javax.xml.bind.annotation.XmlElementDecl.GLOBAL;
+
 import com.ctre.CANTalon;
 
+import edu.wpi.first.wpilibj.PWM;
+import edu.wpi.first.wpilibj.Solenoid;
 import edu.wpi.first.wpilibj.networktables.NetworkTable;
 
 public class Autonomous {
@@ -11,7 +15,10 @@ public class Autonomous {
 	CANTalon rightDrivetrain1 = new CANTalon(3);
 	CANTalon rightDrivetrain2 = new CANTalon(4);
 	CANTalon rightDrivetrainSlaveMotor = new CANTalon(0);
+	
 	int autoLoop;
+	Solenoid GRIPLight = new Solenoid (0, 8);
+	
 	NetworkTable contourReport;
 	double[] defaultValues;
 	private int autonSwitch = 0;
@@ -51,6 +58,7 @@ public class Autonomous {
 			break;
 		}
 	}
+	
 	public void moveRobotForward(double speed) {
 		leftDrivetrain1.set(-speed);
 		leftDrivetrain2.set(-speed);
@@ -92,6 +100,7 @@ public class Autonomous {
 	}
 
 	public void rightPeg() {
+		GRIPLight.set(true);
 		if (autoLoop < 300) {
 			moveRobotForward(.5);
 			autoLoop++;

@@ -9,9 +9,11 @@ import edu.wpi.first.wpilibj.DigitalInput;
 import edu.wpi.first.wpilibj.Encoder;
 import edu.wpi.first.wpilibj.IterativeRobot;
 import edu.wpi.first.wpilibj.Joystick;
+import edu.wpi.first.wpilibj.PWM;
 import edu.wpi.first.wpilibj.RobotDrive;
 import edu.wpi.first.wpilibj.Solenoid;
 import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.command.Command;
 import edu.wpi.first.wpilibj.livewindow.LiveWindow;
 import edu.wpi.first.wpilibj.networktables.NetworkTable;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
@@ -20,6 +22,7 @@ import edu.wpi.first.wpilibj.AnalogInput;
 import edu.wpi.first.wpilibj.CameraServer;
 
 public class Robot extends IterativeRobot {
+	Autonomous autoRobot;
 	RobotDrive myRobot;
 	Joystick stick;
 	Joystick xbox;
@@ -39,7 +42,7 @@ public class Robot extends IterativeRobot {
 	Solenoid solenoidSpeedshift = new Solenoid(0, 1);
 	Solenoid solenoidWhaleTailServo = new Solenoid(0, 2);
 	Solenoid LEDRing = new Solenoid(0, 7);
-
+	
 	int currCompressor;
 	int compressoron;
 	int compressoroff;
@@ -63,20 +66,12 @@ public class Robot extends IterativeRobot {
 	int switchCFinal;
 	int switBinFin;
 
+	Command autonomousCommand;
+	SendableChooser autoChooser;
+	
 	public Robot() {
 	}
-
-	public void robotInit() {
-		myRobot = new RobotDrive(leftDrivetrain1, leftDrivetrain2, rightDrivetrain1, rightDrivetrain2);
-		rightDrivetrainSlaveMotor.changeControlMode(TalonControlMode.Follower);
-		rightDrivetrainSlaveMotor.set(3);
-		stick = new Joystick(0); // joystick
-		xbox = new Joystick(1); // xbox controller
-		auton = 0;
-		contourReport = NetworkTable.getTable("GRIP/myContoursReport");
-		CameraServer.getInstance().startAutomaticCapture();
-	}
-
+	
 	public void moveRobotForward(double speed) {
 		leftDrivetrain1.set(-speed);
 		leftDrivetrain2.set(-speed);
@@ -112,6 +107,22 @@ public class Robot extends IterativeRobot {
 		rightDrivetrain2.set(-speedRight);
 		// rightDrivetrain3.set(-speedRight);
 	}
+	
+	public void robotInit() {
+		LEDRing.set(true);
+		autoChooser = new SendableChooser();
+		autoChooser.addDefault("My Default", new Autonomous(0));
+		autoChooser.addObject("Right Peg", new Autonomous(1));
+		SmartDashboard.putData("Autonomous Chooser", autoChooser);
+		myRobot = new RobotDrive(leftDrivetrain1, leftDrivetrain2, rightDrivetrain1, rightDrivetrain2);
+		rightDrivetrainSlaveMotor.changeControlMode(TalonControlMode.Follower);
+		rightDrivetrainSlaveMotor.set(3);
+		stick = new Joystick(0); // joystick
+		xbox = new Joystick(1); // xbox controller
+		auton = 0;
+		contourReport = NetworkTable.getTable("GRIP/myContoursReport");
+		CameraServer.getInstance().startAutomaticCapture();
+	}
 
 	public double getUltrasonicInches() {
 		// In two locations we measured the ultrasonic voltage and the distance
@@ -129,6 +140,8 @@ public class Robot extends IterativeRobot {
 	public void autonomousInit() {
 		autoLoop = 0;
 		auton = 0;
+		autoRobot = (Autonomous) autoChooser.getSelected();
+		autoRobot.start();
 	}
 
 	public void autonomousPeriodic() {
@@ -281,7 +294,6 @@ public class Robot extends IterativeRobot {
 												// retract piston
 			}
 		}
-
 		String alexisgreat = "hi kate :)";
 	}
 
