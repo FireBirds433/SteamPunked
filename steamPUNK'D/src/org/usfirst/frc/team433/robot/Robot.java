@@ -4,31 +4,26 @@ import com.ctre.CANTalon;
 import com.ctre.CANTalon.TalonControlMode;
 
 import edu.wpi.cscore.VideoCamera;
+import edu.wpi.first.wpilibj.AnalogInput;
+import edu.wpi.first.wpilibj.CameraServer;
 import edu.wpi.first.wpilibj.Compressor;
 import edu.wpi.first.wpilibj.DigitalInput;
-import edu.wpi.first.wpilibj.Encoder;
 import edu.wpi.first.wpilibj.IterativeRobot;
 import edu.wpi.first.wpilibj.Joystick;
-import edu.wpi.first.wpilibj.PWM;
 import edu.wpi.first.wpilibj.RobotDrive;
 import edu.wpi.first.wpilibj.Solenoid;
-import edu.wpi.first.wpilibj.Timer;
-import edu.wpi.first.wpilibj.command.Command;
 import edu.wpi.first.wpilibj.livewindow.LiveWindow;
 import edu.wpi.first.wpilibj.networktables.NetworkTable;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
-import edu.wpi.first.wpilibj.AnalogInput;
-import edu.wpi.first.wpilibj.CameraServer;
 
 public class Robot extends IterativeRobot {
-	Autonomous autoRobot;
+	AutonomousRobot autonomousRobot;
 	RobotDrive myRobot;
-	Joystick stick;
-	Joystick xbox;
+	Joystick joystick;
+	Joystick xboxController;
 	CANTalon leftDrivetrain1 = new CANTalon(1);
 	CANTalon leftDrivetrain2 = new CANTalon(2);
-	// CANTalon leftDrivetrainSlaveMotor = new CANTalon(0);
 	CANTalon rightDrivetrain1 = new CANTalon(3);
 	CANTalon rightDrivetrain2 = new CANTalon(4);
 	CANTalon rightDrivetrainSlaveMotor = new CANTalon(0);
@@ -38,11 +33,11 @@ public class Robot extends IterativeRobot {
 	CameraServer server;
 	Compressor compressor = new Compressor(0);
 
-	Solenoid solenoidGearFloorRetriever = new Solenoid(0, 0);
-	Solenoid solenoidSpeedshift = new Solenoid(0, 1);
-	Solenoid solenoidWhaleTailServo = new Solenoid(0, 2);
-	Solenoid LEDRing = new Solenoid(0, 7);
-	
+	// Solenoid solenoidGearFloorRetriever = new Solenoid(0, 0);
+	Solenoid solenoidSpeedshift = null;// new Solenoid(0, 1);
+	Solenoid solenoidWhaleTailServo = null;// new Solenoid(0, 2);
+	Solenoid LEDRing;// = new Solenoid(0, 7);
+
 	int currCompressor;
 	int compressoron;
 	int compressoroff;
@@ -50,14 +45,11 @@ public class Robot extends IterativeRobot {
 	int autoLoop = 0;
 	NetworkTable contourReport;
 	VideoCamera camFront;
-	AnalogInput ultrasonic = new AnalogInput(3);
-	// AnalogInput future2 = new AnalogInput(1);
-	// AnalogInput future3 = new AnalogInput(2);
-	// AnalogInput future4 = new AnalogInput(4);
+	AnalogInput ultrasonic = null;// = new AnalogInput(3);
 
-	DigitalInput autonSwitchA = new DigitalInput(0);
-	DigitalInput autonSwitchB = new DigitalInput(1);
-	DigitalInput autonSwitchC = new DigitalInput(2);
+	DigitalInput autonSwitchA;// new DigitalInput(0);
+	DigitalInput autonSwitchB;// new DigitalInput(1);
+	DigitalInput autonSwitchC;// new DigitalInput(2);
 	double[] defaultValues;
 
 	int auton;
@@ -66,227 +58,160 @@ public class Robot extends IterativeRobot {
 	int switchCFinal;
 	int switBinFin;
 
-	Command autonomousCommand;
-	SendableChooser autoChooser;
-	
+	SendableChooser<AutonomousRobot> autoChooser;
+
 	public Robot() {
 	}
-	
+
+	/**
+	 * This method moves the robot forward.
+	 * 
+	 * @param speed
+	 *            A representation of the speed of the motor.
+	 */
 	public void moveRobotForward(double speed) {
 		leftDrivetrain1.set(-speed);
 		leftDrivetrain2.set(-speed);
-		// leftDrivetrain3.set(-speed);
 		rightDrivetrain1.set(speed);
 		rightDrivetrain2.set(speed);
-		// rightDrivetrain3.set(speed);
 	}
 
+	/**
+	 * This method moves the robot backwards.
+	 * 
+	 * @param speed
+	 *            A representation of the speed of the motor.
+	 */
 	public void moveRobotReverse(double speed) {
 		leftDrivetrain1.set(speed);
 		leftDrivetrain2.set(speed);
-		// leftDrivetrain3.set(speed);
 		rightDrivetrain1.set(-speed);
 		rightDrivetrain2.set(-speed);
-		// rightDrivetrain3.set(-speed);
 	}
 
+	/**
+	 * This method turns the robot left.
+	 * 
+	 * @param speedLeft
+	 *            A representation of the speed of the motor.
+	 * @param speedRight
+	 *            A representation of the speed of the motor.
+	 */
 	public void moveRobotTurnLeft(double speedLeft, double speedRight) {
 		leftDrivetrain1.set(speedLeft);
 		leftDrivetrain2.set(speedLeft);
-		// leftDrivetrain3.set(speedLeft);
 		rightDrivetrain1.set(speedRight);
 		rightDrivetrain2.set(speedRight);
-		// rightDrivetrain3.set(speedRight);
 	}
 
+	/**
+	 * This method turns the robot right.
+	 * 
+	 * @param speedLeft
+	 *            A representation of the speed of the motor.
+	 * @param speedRight
+	 *            A representation of the speed of the motor.
+	 */
 	public void moveRobotTurnRight(double speedLeft, double speedRight) {
 		leftDrivetrain1.set(-speedLeft);
 		leftDrivetrain2.set(-speedLeft);
-		// leftDrivetrain3.set(-speedLeft);
 		rightDrivetrain1.set(-speedRight);
 		rightDrivetrain2.set(-speedRight);
-		// rightDrivetrain3.set(-speedRight);
 	}
-	
+
+	@Override
 	public void robotInit() {
-		LEDRing.set(true);
-		autoChooser = new SendableChooser();
-		autoChooser.addDefault("My Default", new Autonomous(0));
-		autoChooser.addObject("Right Peg", new Autonomous(1));
+		autoChooser = new SendableChooser<AutonomousRobot>();
+		autoChooser.addDefault("My Default", new AutonomousRobot(0));
+		autoChooser.addObject("Right Peg", new AutonomousRobot(1));
+		autoChooser.addObject("Center Peg", new AutonomousRobot(2));
+		autoChooser.addObject("Left Peg", new AutonomousRobot(3));
+		autoChooser.addObject("Right Hopper", new AutonomousRobot(4));
+		autoChooser.addObject("Do Nothing", new AutonomousRobot(5));
+		autoChooser.addObject("Left Hopper", new AutonomousRobot(6));
+		autoChooser.addObject("Cross Baseline", new AutonomousRobot(7));
 		SmartDashboard.putData("Autonomous Chooser", autoChooser);
+
 		myRobot = new RobotDrive(leftDrivetrain1, leftDrivetrain2, rightDrivetrain1, rightDrivetrain2);
 		rightDrivetrainSlaveMotor.changeControlMode(TalonControlMode.Follower);
 		rightDrivetrainSlaveMotor.set(3);
-		stick = new Joystick(0); // joystick
-		xbox = new Joystick(1); // xbox controller
+		joystick = new Joystick(0);
+		xboxController = new Joystick(1);
 		auton = 0;
 		contourReport = NetworkTable.getTable("GRIP/myContoursReport");
 		CameraServer.getInstance().startAutomaticCapture();
 	}
 
+	/**
+	 * In two locations we measured the ultra-sonic voltage and the distance in
+	 * inches. First calculate slope by dividing the difference in inches by the
+	 * difference in voltage measurements Use equation of a line to find the
+	 * offsets. So the result is the volts converted to inches.
+	 * 
+	 * @return The number of inches from the ultra-sonic sensor.
+	 */
 	public double getUltrasonicInches() {
-		// In two locations we measured the ultrasonic voltage and the distance
-		// in inches.
-		// First calculate slope by dividing the difference in inches by the
-		// difference in voltage measurements
-		// Use equation of a line to find the offsets
-		double result;
+		// TODO What do the values 17.86 and 1.7842 represent? These should be
+		// defined as static variables w/ descriptive names
 		double rawVoltage = ultrasonic.getVoltage();
-		result = (rawVoltage * 17.86) + 1.7842;// so the result is the volts
-												// converted to inches
-		return result;
+		return (rawVoltage * 17.86) + 1.7842;
 	}
 
+	@Override
 	public void autonomousInit() {
+		/*
+		 * autonSwitchA = new DigitalInput(0); autonSwitchB = new
+		 * DigitalInput(1); autonSwitchC = new DigitalInput(2); // FIXME
+		 * switRaw1/2/3 and switBinFin are use to select which autonomous //
+		 * program to run based off of the physical switches. Are we still using
+		 * // these? // Remember we are using the autoChooser in robotInit() to
+		 * allow the // driver to select which program to run, we then execute
+		 * the selected // autonomous // program in autonomousInit(). boolean
+		 * analogSwitch1 = autonSwitchA.get(); boolean analogSwitch2 =
+		 * autonSwitchB.get(); boolean analogSwitch3 = autonSwitchC.get();
+		 * 
+		 * if (analogSwitch1) { switchAFinal = 1; } else { switchAFinal = 0; }
+		 * if (analogSwitch2) { switchBFinal = 1; } else { switchBFinal = 0; }
+		 * if (analogSwitch3) { switchCFinal = 1; } else { switchCFinal = 0; }
+		 * 
+		 * int switchFinal = (switchAFinal * 4) + (switchBFinal * 2) +
+		 * switchCFinal; // XXX Added this if/else block to replace the case
+		 * switch which is now // in the autonomous class. if (autonomousRobot
+		 * != null) { autonomousRobot.setAutonomousProgramSelector(switchFinal);
+		 * } else { autonomousRobot = new AutonomousRobot(switchFinal); }
+		 * autonomousRobot.start();
+		 */
 		autoLoop = 0;
 		auton = 0;
-		autoRobot = (Autonomous) autoChooser.getSelected();
-		autoRobot.start();
+		autonomousRobot = autoChooser.getSelected();
+		LEDRing = new Solenoid(0, 7);
+		LEDRing.set(true);
+		autonomousRobot.start();
+
 	}
 
+	@Override
 	public void autonomousPeriodic() {
 
-		boolean switRaw1 = autonSwitchA.get();// analog switch 1
-		boolean switRaw2 = autonSwitchB.get();// analog switch 2
-		boolean switRaw3 = autonSwitchC.get();// analog switch 3
-
-		if (switRaw1) {
-			switchAFinal = 1;
-		} else {
-			switchAFinal = 0;
-		}
-		if (switRaw2) {
-			switchBFinal = 1;
-		} else {
-			switchBFinal = 0;
-		}
-		if (switRaw3) {
-			switchCFinal = 1;
-		} else {
-			switchCFinal = 0;
-		}
-
-		int switBinFin = (switchAFinal * 4) + (switchBFinal * 2) + switchCFinal;
-
-		switch (switBinFin) {
-		case 0:
-			DoNothing();
-			break;
-		case 1:
-			rightPeg();
-			break;
-		case 2:
-			centerPeg();
-			break;
-		case 3:
-			rightHopper();
-			break;
-		case 4:
-			leftPeg();
-			break;
-		case 5:
-			notSureYet();
-			break;
-		case 6:
-			leftHopper();
-			break;
-		case 7:
-			crossBaseline();
-			break;
-		}
+		processCameraImage();
 	}
 
-	public void DoNothing() {// all switch down
-		moveRobotForward(0);
-	}
-
-	public void rightPeg() {
-		if (autoLoop < 300) {
-			moveRobotForward(.5);
-			autoLoop++;
-		}
-
-		if (autoLoop >= 300) {
-			try {
-				double[] centerx = contourReport.getNumberArray("centerx", defaultValues);
-				double centerxavg = (centerx[0] + centerx[1]) / 2;
-				double[] GRIPheight = contourReport.getNumberArray("height", defaultValues);
-				double height = GRIPheight[0];
-				if (centerxavg < 60) {
-					moveRobotTurnLeft(.4, .4);
-				} else if (centerxavg >= 60 && centerxavg < 120) {
-					moveRobotReverse(0);
-				}
-				if (height < 40) {
-					moveRobotForward(.5);
-				} else {
-					moveRobotReverse(0);
-				}
-			} catch (ArrayIndexOutOfBoundsException e) {
-				System.out.println("Array123 is out of Bounds" + e);
-			}
-		}
-	}
-
-	public void centerPeg() {
-		// Dariya and Erin project --- TBD
-	}
-
-	public void rightHopper() {
-	}
-
-	public void leftPeg() {
-		if (autoLoop < 300) {
-			moveRobotForward(.5);
-			autoLoop++;
-		}
-
-		if (autoLoop >= 300) {
-			try {
-				double[] centerx = contourReport.getNumberArray("centerx", defaultValues);
-				double centerxavg = (centerx[0] + centerx[1]) / 2;
-				double[] GRIPheight = contourReport.getNumberArray("height", defaultValues);
-				double height = GRIPheight[0];
-				if (centerxavg < 60) {
-					moveRobotTurnRight(.4, .4);
-				} else if (centerxavg >= 60 && centerxavg < 120) {
-					moveRobotReverse(0);
-				}
-				if (height < 40) {
-					moveRobotForward(.5);
-				} else {
-					moveRobotReverse(0);
-				}
-
-			} catch (ArrayIndexOutOfBoundsException e) {
-				System.out.println("Array123 is out of Bounds" + e);
-			}
-		}
-	}
-
-	public void notSureYet() {
-	}
-
-	public void leftHopper() {
-	}
-
-	public void crossBaseline() {
-	}
-
+	@Override
 	public void teleopInit() {
 	}
 
+	@Override
 	public void teleopPeriodic() {
 
 		// BASIC DRIVE CONTROL - JOYSTICK
-		double stickZ = stick.getRawAxis(2);
-		double stickY = stick.getRawAxis(1);
+		double stickZ = joystick.getRawAxis(2);
+		double stickY = joystick.getRawAxis(1);
 		double Z2norm = stickZ * (NORMSPEED / 100.0);
 		double y2norm = stickY * (NORMSPEED / 100.0) + Math.signum(stickY) * 0.05;
 		myRobot.arcadeDrive(y2norm, Z2norm, true);
 
 		if (currCompressor == compressoron) {
-			if (stick.getRawButton(1)) {
+			if (joystick.getRawButton(1)) {
 				solenoidSpeedshift.set(false); // solenoid set "true" will push
 												// piston in
 			} else {
@@ -294,13 +219,30 @@ public class Robot extends IterativeRobot {
 												// retract piston
 			}
 		}
-		String alexisgreat = "hi kate :)";
 	}
 
+	@Override
 	public void testPeriodic() {
 		LiveWindow.addActuator("Drive Talon", "Right Front", rightDrivetrain1);
 		LiveWindow.addActuator("Drive Talon", "Right Rear", rightDrivetrain2);
 		LiveWindow.addActuator("Drive Talon", "Left Front", leftDrivetrain1);
 		LiveWindow.addActuator("Drive Talon", "Left Rear", leftDrivetrain2);
 	}
+
+	private void processCameraImage() {
+		// TODO pull image from camera
+		// autonomousRobot.cameraProcessor.process(null); // TODO this calls the
+		// process method in
+		// GripPipeline, need to
+		// replace null with
+		// camera output.
+
+		// FIXME The below statement needs to insert the output of the GRIP
+		// processor into the contourReport.
+
+		// contourReport.putNumberArray("ImageMatrix",
+		// autonomousRobot.cameraProcessor.filterContoursOutput());
+
+	}
+
 }
