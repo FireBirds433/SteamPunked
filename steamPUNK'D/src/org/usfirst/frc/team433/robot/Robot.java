@@ -12,7 +12,7 @@ import edu.wpi.first.wpilibj.IterativeRobot;
 import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.RobotDrive;
 import edu.wpi.first.wpilibj.Solenoid;
-import edu.wpi.first.wpilibj.livewindow.LiveWindow;
+import edu.wpi.first.wpilibj.Talon;
 import edu.wpi.first.wpilibj.networktables.NetworkTable;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -21,42 +21,63 @@ public class Robot extends IterativeRobot {
 	AutonomousRobot autonomousRobot;
 	RobotDrive myRobot;
 	Joystick joystick;
-	Joystick xboxController;
-	CANTalon leftDrivetrain1 = new CANTalon(1);
-	CANTalon leftDrivetrain2 = new CANTalon(2);
-	CANTalon rightDrivetrain1 = new CANTalon(3);
-	CANTalon rightDrivetrain2 = new CANTalon(4);
-	CANTalon rightDrivetrainSlaveMotor = new CANTalon(0);
-	CANTalon gearRetrievalPivot = new CANTalon(6);
-	CANTalon gearRetrievalAgitator = new CANTalon(7);
-	CANTalon gearRetrievalFlap = new CANTalon(8);
-	CameraServer server;
-	Compressor compressor = new Compressor(0);
+	Joystick xbox;
 
-	// Solenoid solenoidGearFloorRetriever = new Solenoid(0, 0);
-	Solenoid solenoidSpeedshift = null;// new Solenoid(0, 1);
-	Solenoid solenoidWhaleTailServo = null;// new Solenoid(0, 2);
-	Solenoid LEDRing;// = new Solenoid(0, 7);
-
+	// compressor
+	Compressor compressor;
 	int currCompressor;
 	int compressoron;
 	int compressoroff;
+
+	// drivetrain
+	Solenoid solenoidSpeedshift = null;
 	int NORMSPEED = 100;
-	int autoLoop = 0;
+	CANTalon rightDrivetrain1 = new CANTalon(1);
+	CANTalon rightDrivetrain2 = new CANTalon(2);
+	CANTalon rightDrivetrainSlaveMotor = new CANTalon(3);
+	CANTalon leftDrivetrain1 = new CANTalon(4);
+	CANTalon leftDrivetrain2 = new CANTalon(5);
+	CANTalon leftDrivetrainSlaveMotor = new CANTalon(6);
+
+	// hanging mechanism
+	CANTalon hangMotor1 = new CANTalon(7);
+	CANTalon hangMotor2 = new CANTalon(8);
+
+	// camera
+	CameraServer server;
+	Solenoid LEDRing;
+	double[] defaultValues;
 	NetworkTable contourReport;
 	VideoCamera camFront;
-	AnalogInput ultrasonic = null;// = new AnalogInput(3);
 
-	DigitalInput autonSwitchA;// new DigitalInput(0);
-	DigitalInput autonSwitchB;// new DigitalInput(1);
-	DigitalInput autonSwitchC;// new DigitalInput(2);
-	double[] defaultValues;
+	// loading station retrieval
+	Talon gearRetrievalPivot = new Talon(1);
+	Talon gearRetrievalAgitator = new Talon(2);
+	AnalogInput gearUltrasonicAgitator;
+	DigitalInput uprightGearLimitSwitch;
+	DigitalInput angledGearLimitSwitch;
+	Solenoid solenoidWhaleTailServo = null;
+	DigitalInput agitatorInPosition;
+	boolean fl_gearBarUp;
 
+	// floor gear retrieval
+	Solenoid solenoidGearFloorRetrieval = null;
+	Talon backGearRetrieval = new Talon(3);
+
+	// autonomous
+	DigitalInput autonSwitchA;
+	DigitalInput autonSwitchB;
+	DigitalInput autonSwitchC;
 	int auton;
+	int turnRight;
+	int autoLoop;
 	int switchAFinal;
 	int switchBFinal;
 	int switchCFinal;
 	int switBinFin;
+
+	// sensors
+	AnalogInput ultrasonic = null;
 
 	SendableChooser<AutonomousRobot> autoChooser;
 
@@ -132,55 +153,139 @@ public class Robot extends IterativeRobot {
 		autoChooser.addObject("Cross Baseline", new AutonomousRobot(7));
 		SmartDashboard.putData("Autonomous Chooser", autoChooser);
 
+		joystick = new Joystick(0);
+		xbox = new Joystick(1);
+		compressor = new Compressor(0);
+
+		// drievtrain
 		myRobot = new RobotDrive(leftDrivetrain1, leftDrivetrain2, rightDrivetrain1, rightDrivetrain2);
 		rightDrivetrainSlaveMotor.changeControlMode(TalonControlMode.Follower);
 		rightDrivetrainSlaveMotor.set(3);
-		joystick = new Joystick(0);
-		xboxController = new Joystick(1);
+		leftDrivetrainSlaveMotor.changeControlMode(TalonControlMode.Follower);
+		rightDrivetrainSlaveMotor.set(3);
+
+		solenoidSpeedshift = new Solenoid(0, 1);
+
+		// front gear delivery
+		fl_gearBarUp = false;
+		gearUltrasonicAgitator = new AnalogInput(1);
+		uprightGearLimitSwitch = new DigitalInput(1);
+		angledGearLimitSwitch = new DigitalInput(2);
+		agitatorInPosition = new DigitalInput(3);
+		solenoidWhaleTailServo = new Solenoid(0, 2);
+
+		// floor gear retrieval
+		solenoidGearFloorRetrieval = new Solenoid(0, 0);
+
+		// autonomous
 		auton = 0;
+		autonSwitchA = new DigitalInput(0);
+		autonSwitchB = new DigitalInput(1);
+		autonSwitchC = new DigitalInput(2);
+
+		// camera
+		LEDRing = new Solenoid(0, 7);
 		contourReport = NetworkTable.getTable("GRIP/myContoursReport");
 		CameraServer.getInstance().startAutomaticCapture();
+
+		// sensors
+		ultrasonic = new AnalogInput(3);
 	}
 
-	/**
-	 * In two locations we measured the ultra-sonic voltage and the distance in
-	 * inches. First calculate slope by dividing the difference in inches by the
-	 * difference in voltage measurements Use equation of a line to find the
-	 * offsets. So the result is the volts converted to inches.
-	 * 
-	 * @return The number of inches from the ultra-sonic sensor.
-	 */
 	public double getUltrasonicInches() {
-		// TODO What do the values 17.86 and 1.7842 represent? These should be
-		// defined as static variables w/ descriptive names
+		// In two locations we measured the ultrasonic voltage and the distance
+		// in inches.
+		// First calculate slope by dividing the difference in inches by the
+		// difference in voltage measurements
+		// Use equation of a line to find the offsets
 		double rawVoltage = ultrasonic.getVoltage();
-		return (rawVoltage * 17.86) + 1.7842;
+		return (rawVoltage * 17.86) + 1.7842; // so the result is the volts
+												// converted to inches
+
+	}
+
+	public boolean isGearBarUp() {
+		boolean result;
+		double ultrasonicValue = gearUltrasonicAgitator.getVoltage();
+		if (ultrasonicValue < .1) {
+			result = false;
+		} else {
+			result = true;
+		}
+		return result;
+	}
+
+	public boolean isGearInPosition() {
+		boolean result;
+		double ultrasonicValue = gearUltrasonicAgitator.getVoltage();
+		if (ultrasonicValue < .1) {
+			result = true;
+		} else {
+			result = false;
+		}
+		return result;
 	}
 
 	@Override
 	public void autonomousInit() {
-		/*
-		 * autonSwitchA = new DigitalInput(0); autonSwitchB = new
-		 * DigitalInput(1); autonSwitchC = new DigitalInput(2); // FIXME
-		 * switRaw1/2/3 and switBinFin are use to select which autonomous //
-		 * program to run based off of the physical switches. Are we still using
-		 * // these? // Remember we are using the autoChooser in robotInit() to
-		 * allow the // driver to select which program to run, we then execute
-		 * the selected // autonomous // program in autonomousInit(). boolean
-		 * analogSwitch1 = autonSwitchA.get(); boolean analogSwitch2 =
-		 * autonSwitchB.get(); boolean analogSwitch3 = autonSwitchC.get();
-		 * 
-		 * if (analogSwitch1) { switchAFinal = 1; } else { switchAFinal = 0; }
-		 * if (analogSwitch2) { switchBFinal = 1; } else { switchBFinal = 0; }
-		 * if (analogSwitch3) { switchCFinal = 1; } else { switchCFinal = 0; }
-		 * 
-		 * int switchFinal = (switchAFinal * 4) + (switchBFinal * 2) +
-		 * switchCFinal; // XXX Added this if/else block to replace the case
-		 * switch which is now // in the autonomous class. if (autonomousRobot
-		 * != null) { autonomousRobot.setAutonomousProgramSelector(switchFinal);
-		 * } else { autonomousRobot = new AutonomousRobot(switchFinal); }
-		 * autonomousRobot.start();
-		 */
+
+		autonSwitchA = new DigitalInput(0);
+		autonSwitchB = new DigitalInput(1);
+		autonSwitchC = new DigitalInput(2); // FIXME switRaw1/2/3 and switBinFin
+											// are use to select which
+											// autonomous program to run based
+											// off of the physical switches. Are
+											// we still using these? Remember we
+											// are using the
+											// autoChooser in robotInit() to
+											// allow the driver to select which
+											// program to run, we then execute
+											// the selected autonomousprogram in
+											// autonomousInit().
+		boolean analogSwitch1 = autonSwitchA.get();
+		boolean analogSwitch2 = autonSwitchB.get();
+		boolean analogSwitch3 = autonSwitchC.get();
+
+		if (analogSwitch1) {
+			switchAFinal = 1;
+		} else {
+			switchAFinal = 0;
+		}
+		if (analogSwitch2) {
+			switchBFinal = 1;
+		} else {
+			switchBFinal = 0;
+		}
+		if (analogSwitch3) {
+			switchCFinal = 1;
+		} else {
+			switchCFinal = 0;
+		}
+
+		int switchFinal = (switchAFinal * 4) + (switchBFinal * 2) + switchCFinal; // XXX
+																					// Added
+																					// this
+																					// if/else
+																					// block
+																					// to
+																					// replace
+																					// the
+																					// case
+																					// switch
+																					// which
+																					// is
+																					// now
+																					// in
+																					// the
+																					// autonomous
+																					// class.
+		if (autonomousRobot != null) {
+			autonomousRobot.setAutonomousProgramSelector(switchFinal);
+		} else {
+			autonomousRobot = new AutonomousRobot(switchFinal);
+		}
+		autonomousRobot.start();
+
 		autoLoop = 0;
 		auton = 0;
 		autonomousRobot = autoChooser.getSelected();
@@ -193,7 +298,222 @@ public class Robot extends IterativeRobot {
 	@Override
 	public void autonomousPeriodic() {
 
+		boolean switRaw1 = autonSwitchA.get();// analog switch 1
+		boolean switRaw2 = autonSwitchB.get();// analog switch 2
+		boolean switRaw3 = autonSwitchC.get();// analog switch 3
+
+		if (switRaw1) {
+			switchAFinal = 1;
+		} else {
+			switchAFinal = 0;
+		}
+
+		if (switRaw2) {
+			switchBFinal = 1;
+		} else {
+			switchBFinal = 0;
+		}
+
+		if (switRaw3) {
+			switchCFinal = 1;
+		} else {
+			switchCFinal = 0;
+		}
+
+		int switBinFin = (switchAFinal * 4) + (switchBFinal * 2) + switchCFinal;
+
+		switch (switBinFin) {
+		case 0:
+			DoNothing();
+			break;
+		case 1:
+			rightPeg();
+			break;
+		case 2:
+			centerPeg();
+			break;
+		case 3:
+			rightHopper();
+			break;
+		case 4:
+			leftPeg();
+			break;
+		case 5:
+			centerPegandStay();
+			break;
+		case 6:
+			leftHopper();
+			break;
+		case 7:
+			crossBaseline();
+			break;
+		}
 		processCameraImage();
+	}
+
+	public void DoNothing() {
+		moveRobotForward(0);
+	}
+
+	public void rightPeg() {
+		LEDRing.set(true);
+
+		if (autoLoop < 120) {
+			moveRobotForward(.5);
+			autoLoop++;
+			SmartDashboard.putNumber("autoLoop", autoLoop);
+		} else if (autoLoop >= 120) {
+			try {
+				if (turnRight <= 1) {
+					moveRobotTurnLeft(.25, .25);
+				}
+
+				double[] defaultValues = new double[5];
+				defaultValues[0] = 10;
+				defaultValues[1] = 10;
+				defaultValues[2] = 10;
+				defaultValues[3] = 10;
+				defaultValues[4] = 10;
+				double[] centerx = contourReport.getNumberArray("centerx", defaultValues);
+				double centerxavg = (centerx[0] + centerx[1]) / 2;
+				double[] GRIPheight = contourReport.getNumberArray("height", defaultValues);
+				double height = GRIPheight[0] / 1;
+
+				SmartDashboard.putNumber("centerxavg", centerxavg);
+				SmartDashboard.putNumber("grip height", height);
+
+				if (height < 25) {
+					if (centerx[0] < 30) {
+						moveRobotTurnRight(.15, .15);
+					} else if (centerx[0] >= 30 && centerx[0] < 120) {
+						moveRobotForward(.4);
+					}
+				} else {
+					moveRobotReverse(0);
+				}
+
+				turnRight++;
+
+			} catch (ArrayIndexOutOfBoundsException e) {
+				System.out.println("Array123 is out of Bounds" + e);
+			}
+		} else {
+			moveRobotForward(0);
+		}
+
+		SmartDashboard.putNumber("Autonomous Loops", autoLoop);
+		SmartDashboard.putNumber("turnRight", turnRight);
+		LEDRing.set(true);
+
+		if (autoLoop < 120) {
+			moveRobotForward(.5);
+			autoLoop++;
+			SmartDashboard.putNumber("autoLoop", autoLoop);
+		} else if (autoLoop >= 120) {
+			try {
+				if (turnRight <= 1) {
+					moveRobotTurnLeft(.25, .25);
+				}
+
+				double[] defaultValues = new double[5];
+				defaultValues[0] = 10;
+				defaultValues[1] = 10;
+				defaultValues[2] = 10;
+				defaultValues[3] = 10;
+				defaultValues[4] = 10;
+				double[] centerx = contourReport.getNumberArray("centerx", defaultValues);
+				double centerxavg = (centerx[0] + centerx[1]) / 2;
+				double[] GRIPheight = contourReport.getNumberArray("height", defaultValues);
+				double height = GRIPheight[0] / 1;
+
+				SmartDashboard.putNumber("centerxavg", centerxavg);
+				SmartDashboard.putNumber("grip height", height);
+
+				if (height < 25) {
+					if (centerx[0] < 30) {
+						moveRobotTurnRight(.15, .15);
+					} else if (centerx[0] >= 30 && centerx[0] < 120) {
+						moveRobotForward(.4);
+					}
+				} else {
+					moveRobotReverse(0);
+				}
+
+				turnRight++;
+
+			} catch (ArrayIndexOutOfBoundsException e) {
+				System.out.println("Array123 is out of Bounds" + e);
+			}
+		} else {
+			moveRobotForward(0);
+		}
+
+		SmartDashboard.putNumber("Autonomous Loops", autoLoop);
+		SmartDashboard.putNumber("turnRight", turnRight);
+	}
+
+	public void centerPeg() {
+		// Dariya and Erin project --- TBD
+	}
+
+	public void rightHopper() {
+		if (autoLoop < 300) {
+			moveRobotForward(.7);
+		} else if (autoLoop >= 300) {
+			moveRobotTurnRight(.5, .5);
+		} else {
+			moveRobotForward(0);
+		}
+	}
+
+	public void leftPeg() {
+		if (this.autoLoop < 300) {
+			this.moveRobotForward(.5);
+			this.autoLoop++;
+		}
+
+		if (this.autoLoop >= 300) {
+			try {
+				double[] centerx = this.contourReport.getNumberArray("centerx", defaultValues);
+				double centerxavg = (centerx[0] + centerx[1]) / 2;
+				double[] GRIPheight = this.contourReport.getNumberArray("height", defaultValues);
+				double height = GRIPheight[0];
+				if (centerxavg < 60) {
+					this.moveRobotTurnRight(.4, .4);
+				} else if (centerxavg >= 60 && centerxavg < 120) {
+					this.moveRobotReverse(0);
+				}
+				if (height < 40) {
+					this.moveRobotForward(.5);
+				} else {
+					this.moveRobotReverse(0);
+				}
+
+			} catch (ArrayIndexOutOfBoundsException e) {
+				System.out.println("Array123 is out of Bounds" + e);
+			}
+		}
+	}
+
+	public void centerPegandStay() {
+	}
+
+	public void leftHopper() {
+		if (autoLoop < 300) {
+			moveRobotForward(.7);
+		} else if (autoLoop >= 300) {
+			moveRobotTurnLeft(.5, .5);
+		} else {
+			moveRobotForward(0);
+		}
+	}
+
+	public void crossBaseline() {
+		if (autoLoop < 300) {
+			moveRobotForward(.7);
+		} else {
+			moveRobotForward(0);
+		}
 	}
 
 	@Override
@@ -203,13 +523,14 @@ public class Robot extends IterativeRobot {
 	@Override
 	public void teleopPeriodic() {
 
-		// BASIC DRIVE CONTROL - JOYSTICK
+		// drivetrain
 		double stickZ = joystick.getRawAxis(2);
 		double stickY = joystick.getRawAxis(1);
 		double Z2norm = stickZ * (NORMSPEED / 100.0);
 		double y2norm = stickY * (NORMSPEED / 100.0) + Math.signum(stickY) * 0.05;
 		myRobot.arcadeDrive(y2norm, Z2norm, true);
 
+		// speed-shifting
 		if (currCompressor == compressoron) {
 			if (joystick.getRawButton(1)) {
 				solenoidSpeedshift.set(false); // solenoid set "true" will push
@@ -219,23 +540,76 @@ public class Robot extends IterativeRobot {
 												// retract piston
 			}
 		}
+
+		// (teleop1) whale tail piston controls
+		if (xbox.getRawButton(8)) {
+			solenoidWhaleTailServo.set(true);
+		} else if (xbox.getRawButton(9)) {
+			solenoidWhaleTailServo.set(false);
+		} else {
+			solenoidWhaleTailServo.set(false);
+		}
+
+		// (teleop2) gear box pivot
+		// TODO add in limit switch stops
+		boolean isGearboxUpright = uprightGearLimitSwitch.get();
+		boolean isGearboxAngled = angledGearLimitSwitch.get();
+
+		if (xbox.getRawAxis(2) > 0 && !isGearboxUpright) {
+			gearRetrievalPivot.set(xbox.getRawAxis(2) / 2.5);
+		} else if (xbox.getRawAxis(2) < 0 && !isGearboxAngled) {
+			gearRetrievalPivot.set(xbox.getRawAxis(2) / 2.5);
+		} else {
+			gearRetrievalPivot.set(0);
+		}
+
+		// gear box agitator
+		boolean isAgitatorInPosition = agitatorInPosition.get();
+
+		if (joystick.getRawButton(7) && isAgitatorInPosition) {
+			gearRetrievalAgitator.set(.4);
+		} else if (joystick.getRawButton(8) && isAgitatorInPosition) {
+			gearRetrievalAgitator.set(-.4);
+		} else {
+			gearRetrievalAgitator.set(0);
+		}
+
+		// (teleop4) Floor Gear Retrieval
+		if (xbox.getRawAxis(1) != 0) {
+			backGearRetrieval.set(xbox.getRawAxis(1));
+		} else {
+			backGearRetrieval.set(0);
+		}
+
+		if (xbox.getRawButton(6)) {
+			solenoidGearFloorRetrieval.set(true);// arms open
+		} else if (xbox.getRawButton(7)) {
+			solenoidGearFloorRetrieval.set(false);// arms closed
+		} else { // default position: piston IN (arms closed)
+			solenoidGearFloorRetrieval.set(false);
+
+		}
+		// (teleop5) Hanger
+
+		if (xbox.getRawButton(4)) {// ASK TINA what button
+			hangMotor1.set(.5);
+			hangMotor2.set(.5);
+
+		} else {
+			hangMotor1.set(0);
+			hangMotor2.set(0);
+		}
 	}
 
 	@Override
 	public void testPeriodic() {
-		LiveWindow.addActuator("Drive Talon", "Right Front", rightDrivetrain1);
-		LiveWindow.addActuator("Drive Talon", "Right Rear", rightDrivetrain2);
-		LiveWindow.addActuator("Drive Talon", "Left Front", leftDrivetrain1);
-		LiveWindow.addActuator("Drive Talon", "Left Rear", leftDrivetrain2);
 	}
 
 	private void processCameraImage() {
 		// TODO pull image from camera
-		// autonomousRobot.cameraProcessor.process(null); // TODO this calls the
-		// process method in
-		// GripPipeline, need to
-		// replace null with
-		// camera output.
+		// autonomousRobot.cameraProcessor.process(null);
+		// TODO this calls the process method in GripPipeline, need to
+		// replace null with camera output.
 
 		// FIXME The below statement needs to insert the output of the GRIP
 		// processor into the contourReport.
