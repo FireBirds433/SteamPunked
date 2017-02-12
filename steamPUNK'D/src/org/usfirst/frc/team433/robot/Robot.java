@@ -1,8 +1,13 @@
 package org.usfirst.frc.team433.robot;
 
+import org.opencv.core.Mat;
+
 import com.ctre.CANTalon;
 import com.ctre.CANTalon.TalonControlMode;
 
+import edu.wpi.cscore.CvSink;
+import edu.wpi.cscore.CvSource;
+import edu.wpi.cscore.UsbCamera;
 import edu.wpi.cscore.VideoCamera;
 import edu.wpi.first.wpilibj.AnalogInput;
 import edu.wpi.first.wpilibj.CameraServer;
@@ -51,18 +56,21 @@ public class Robot extends IterativeRobot {
 	VideoCamera camFront;
 
 	// loading station retrieval
-	Talon gearRetrievalPivot = new Talon(1);
+	Talon gearRetrievalPivot = new Talon(3);
 	Talon gearRetrievalAgitator = new Talon(2);
 	AnalogInput gearUltrasonicAgitator;
+	Solenoid solenoidWhaleTailServo = null;
+
 	DigitalInput uprightGearLimitSwitch;
 	DigitalInput angledGearLimitSwitch;
-	Solenoid solenoidWhaleTailServo = null;
-	DigitalInput agitatorInPosition;
-	boolean fl_gearBarUp;
+	DigitalInput leftAgitatorInPosition;
+	DigitalInput rightAgitatorInPosition;
 
 	// floor gear retrieval
 	Solenoid solenoidGearFloorRetrieval = null;
 	Talon backGearRetrieval = new Talon(3);
+	DigitalInput floorRetrievalLimitUp = new DigitalInput(2);
+	DigitalInput floorRetrievalLimitDown = new DigitalInput(3);
 
 	// autonomous
 	DigitalInput autonSwitchA;
@@ -158,30 +166,29 @@ public class Robot extends IterativeRobot {
 		compressor = new Compressor(0);
 
 		// drievtrain
+		solenoidSpeedshift = new Solenoid(0, 0);
 		myRobot = new RobotDrive(leftDrivetrain1, leftDrivetrain2, rightDrivetrain1, rightDrivetrain2);
 		rightDrivetrainSlaveMotor.changeControlMode(TalonControlMode.Follower);
-		rightDrivetrainSlaveMotor.set(3);
+		rightDrivetrainSlaveMotor.set(1);
 		leftDrivetrainSlaveMotor.changeControlMode(TalonControlMode.Follower);
-		rightDrivetrainSlaveMotor.set(3);
-
-		solenoidSpeedshift = new Solenoid(0, 1);
+		leftDrivetrainSlaveMotor.set(4);
 
 		// front gear delivery
-		fl_gearBarUp = false;
 		gearUltrasonicAgitator = new AnalogInput(1);
 		uprightGearLimitSwitch = new DigitalInput(1);
 		angledGearLimitSwitch = new DigitalInput(2);
-		agitatorInPosition = new DigitalInput(3);
-		solenoidWhaleTailServo = new Solenoid(0, 2);
+		leftAgitatorInPosition = new DigitalInput(3);
+		rightAgitatorInPosition = new DigitalInput(4);
+		solenoidWhaleTailServo = new Solenoid(0, 1);
 
 		// floor gear retrieval
-		solenoidGearFloorRetrieval = new Solenoid(0, 0);
+		solenoidGearFloorRetrieval = new Solenoid(0, 2);
 
 		// autonomous
 		auton = 0;
-		autonSwitchA = new DigitalInput(0);
-		autonSwitchB = new DigitalInput(1);
-		autonSwitchC = new DigitalInput(2);
+		autonSwitchA = new DigitalInput(7);
+		autonSwitchB = new DigitalInput(8);
+		autonSwitchC = new DigitalInput(9);
 
 		// camera
 		LEDRing = new Solenoid(0, 7);
@@ -190,6 +197,45 @@ public class Robot extends IterativeRobot {
 
 		// sensors
 		ultrasonic = new AnalogInput(3);
+
+		Thread t = new Thread(() -> {
+
+			boolean allowCam1 = false;
+
+			UsbCamera camera1 = CameraServer.getInstance().startAutomaticCapture(0);
+			camera1.setResolution(320, 240);
+			camera1.setFPS(20);
+			UsbCamera camera2 = CameraServer.getInstance().startAutomaticCapture(1);
+			camera2.setResolution(320, 240);
+			camera2.setFPS(20);
+
+			CvSink cvSink1 = CameraServer.getInstance().getVideo(camera1);
+			CvSink cvSink2 = CameraServer.getInstance().getVideo(camera2);
+			CvSource outputStream = CameraServer.getInstance().putVideo("Camera Stream", 320, 240);
+
+			Mat image = new Mat();
+
+			while (!Thread.interrupted()) {
+
+				if (joystick.getRawButton(2)) {
+					allowCam1 = !allowCam1;
+				}
+
+				if (allowCam1) {
+					cvSink2.setEnabled(false);
+					cvSink1.setEnabled(true);
+					cvSink1.grabFrame(image);
+				} else {
+					cvSink1.setEnabled(false);
+					cvSink2.setEnabled(true);
+					cvSink2.grabFrame(image);
+				}
+
+				outputStream.putFrame(image);
+			}
+
+		});
+		t.start();
 	}
 
 	public double getUltrasonicInches() {
@@ -229,19 +275,6 @@ public class Robot extends IterativeRobot {
 	@Override
 	public void autonomousInit() {
 
-		autonSwitchA = new DigitalInput(0);
-		autonSwitchB = new DigitalInput(1);
-		autonSwitchC = new DigitalInput(2); // FIXME switRaw1/2/3 and switBinFin
-											// are use to select which
-											// autonomous program to run based
-											// off of the physical switches. Are
-											// we still using these? Remember we
-											// are using the
-											// autoChooser in robotInit() to
-											// allow the driver to select which
-											// program to run, we then execute
-											// the selected autonomousprogram in
-											// autonomousInit().
 		boolean analogSwitch1 = autonSwitchA.get();
 		boolean analogSwitch2 = autonSwitchB.get();
 		boolean analogSwitch3 = autonSwitchC.get();
@@ -550,55 +583,74 @@ public class Robot extends IterativeRobot {
 			solenoidWhaleTailServo.set(false);
 		}
 
-		// (teleop2) gear box pivot
-		// TODO add in limit switch stops
+		// gear box pivot
 		boolean isGearboxUpright = uprightGearLimitSwitch.get();
 		boolean isGearboxAngled = angledGearLimitSwitch.get();
 
 		if (xbox.getRawAxis(2) > 0 && !isGearboxUpright) {
 			gearRetrievalPivot.set(xbox.getRawAxis(2) / 2.5);
 		} else if (xbox.getRawAxis(2) < 0 && !isGearboxAngled) {
-			gearRetrievalPivot.set(xbox.getRawAxis(2) / 2.5);
+			gearRetrievalPivot.set(-xbox.getRawAxis(2) / 2.5);
 		} else {
 			gearRetrievalPivot.set(0);
 		}
 
 		// gear box agitator
-		boolean isAgitatorInPosition = agitatorInPosition.get();
+		boolean agiPositionLeft = leftAgitatorInPosition.get();
+		boolean agiPositionRight = rightAgitatorInPosition.get();
 
-		if (joystick.getRawButton(7) && isAgitatorInPosition) {
-			gearRetrievalAgitator.set(.4);
-		} else if (joystick.getRawButton(8) && isAgitatorInPosition) {
-			gearRetrievalAgitator.set(-.4);
+		if (agiPositionRight) {
+			if (xbox.getRawButton(1)) {
+				gearRetrievalAgitator.set(-.4);
+			} else if (xbox.getRawButton(2)) {
+				gearRetrievalAgitator.set(0);
+			}
+		} else if (agiPositionLeft) {
+			if (xbox.getRawButton(1)) {
+				gearRetrievalAgitator.set(0);
+			} else if (xbox.getRawButton(2)) {
+				gearRetrievalAgitator.set(.4);
+			}
 		} else {
-			gearRetrievalAgitator.set(0);
+			if (xbox.getRawButton(1)) {
+				gearRetrievalAgitator.set(-.4);
+			} else if (xbox.getRawButton(2)) {
+				gearRetrievalAgitator.set(.4);
+			}
 		}
 
 		// (teleop4) Floor Gear Retrieval
-		if (xbox.getRawAxis(1) != 0) {
+		boolean floorGearPickup = xbox.getRawAxis(1) > .05 || xbox.getRawAxis(1) < -.05;
+		boolean isFloorRetrievalLimitUp = !floorRetrievalLimitUp.get();
+		boolean isFloorRetrievalLimitDown = floorRetrievalLimitDown.get();
+
+		if (isFloorRetrievalLimitUp) {
+			backGearRetrieval.set(0);
+		} else if (isFloorRetrievalLimitDown) {
+			backGearRetrieval.set(0);
+		} else if (floorGearPickup) {
 			backGearRetrieval.set(xbox.getRawAxis(1));
 		} else {
 			backGearRetrieval.set(0);
 		}
 
 		if (xbox.getRawButton(6)) {
-			solenoidGearFloorRetrieval.set(true);// arms open
+			solenoidGearFloorRetrieval.set(true);// arms closed
 		} else if (xbox.getRawButton(7)) {
-			solenoidGearFloorRetrieval.set(false);// arms closed
-		} else { // default position: piston IN (arms closed)
-			solenoidGearFloorRetrieval.set(false);
-
+			solenoidGearFloorRetrieval.set(false);// arms open
 		}
+
 		// (teleop5) Hanger
-
-		if (xbox.getRawButton(4)) {// ASK TINA what button
-			hangMotor1.set(.5);
-			hangMotor2.set(.5);
-
+		if (xbox.getRawButton(4)) {
+			hangMotor1.set(.8);
+			hangMotor2.set(.8);
 		} else {
 			hangMotor1.set(0);
 			hangMotor2.set(0);
 		}
+
+		String alexisgreat = "hi kate :)";
+		SmartDashboard.putString("Alex is Great", alexisgreat);
 	}
 
 	@Override
