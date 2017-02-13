@@ -4,6 +4,7 @@ import org.opencv.core.Mat;
 
 import com.ctre.CANTalon;
 import com.ctre.CANTalon.TalonControlMode;
+import com.kauailabs.navx.frc.AHRS;
 
 import edu.wpi.cscore.CvSink;
 import edu.wpi.cscore.CvSource;
@@ -16,6 +17,7 @@ import edu.wpi.first.wpilibj.DigitalInput;
 import edu.wpi.first.wpilibj.IterativeRobot;
 import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.RobotDrive;
+import edu.wpi.first.wpilibj.SerialPort;
 import edu.wpi.first.wpilibj.Solenoid;
 import edu.wpi.first.wpilibj.Talon;
 import edu.wpi.first.wpilibj.networktables.NetworkTable;
@@ -69,14 +71,15 @@ public class Robot extends IterativeRobot {
 	// floor gear retrieval
 	Solenoid solenoidGearFloorRetrieval = null;
 	Talon backGearRetrieval = new Talon(3);
-	DigitalInput floorRetrievalLimitUp = new DigitalInput(2);
-	DigitalInput floorRetrievalLimitDown = new DigitalInput(3);
+	DigitalInput floorRetrievalLimitUp;
+	DigitalInput floorRetrievalLimitDown;
 
 	// autonomous
 	DigitalInput autonSwitchA;
 	DigitalInput autonSwitchB;
 	DigitalInput autonSwitchC;
 	int auton;
+	int josh;
 	int turnRight;
 	int autoLoop;
 	int switchAFinal;
@@ -86,6 +89,7 @@ public class Robot extends IterativeRobot {
 
 	// sensors
 	AnalogInput ultrasonic = null;
+	AHRS navx;
 
 	SendableChooser<AutonomousRobot> autoChooser;
 
@@ -165,6 +169,8 @@ public class Robot extends IterativeRobot {
 		xbox = new Joystick(1);
 		compressor = new Compressor(0);
 
+		navx = new AHRS(SerialPort.Port.kUSB);
+
 		// drievtrain
 		solenoidSpeedshift = new Solenoid(0, 0);
 		myRobot = new RobotDrive(leftDrivetrain1, leftDrivetrain2, rightDrivetrain1, rightDrivetrain2);
@@ -176,14 +182,15 @@ public class Robot extends IterativeRobot {
 		// front gear delivery
 		gearUltrasonicAgitator = new AnalogInput(1);
 		uprightGearLimitSwitch = new DigitalInput(1);
-		angledGearLimitSwitch = new DigitalInput(2);
-		leftAgitatorInPosition = new DigitalInput(3);
-		rightAgitatorInPosition = new DigitalInput(4);
+		angledGearLimitSwitch = new DigitalInput(6);
+		leftAgitatorInPosition = new DigitalInput(4);
+		rightAgitatorInPosition = new DigitalInput(5);
 		solenoidWhaleTailServo = new Solenoid(0, 1);
 
 		// floor gear retrieval
 		solenoidGearFloorRetrieval = new Solenoid(0, 2);
-
+		floorRetrievalLimitUp = new DigitalInput(2);
+		floorRetrievalLimitDown = new DigitalInput(3);
 		// autonomous
 		auton = 0;
 		autonSwitchA = new DigitalInput(7);
@@ -274,7 +281,7 @@ public class Robot extends IterativeRobot {
 
 	@Override
 	public void autonomousInit() {
-
+		josh = 0;
 		boolean analogSwitch1 = autonSwitchA.get();
 		boolean analogSwitch2 = autonSwitchB.get();
 		boolean analogSwitch3 = autonSwitchC.get();
@@ -662,6 +669,9 @@ public class Robot extends IterativeRobot {
 
 		String alexisgreat = "hi kate :)";
 		SmartDashboard.putString("Alex is Great", alexisgreat);
+
+		SmartDashboard.putNumber("Ultrasonic Inches", getUltrasonicInches());
+
 	}
 
 	@Override

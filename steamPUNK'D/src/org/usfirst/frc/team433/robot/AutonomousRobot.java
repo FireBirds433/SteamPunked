@@ -1,5 +1,7 @@
 package org.usfirst.frc.team433.robot;
 
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+
 public class AutonomousRobot extends Robot {
 	// Solenoid GRIPLight = new Solenoid(0, 8);
 	double[] defaultValues;
@@ -47,6 +49,7 @@ public class AutonomousRobot extends Robot {
 	/**
 	 * This method sets the motors to zero speed.
 	 */
+	@Override
 	public void DoNothing() {
 		this.moveRobotForward(0);
 	}
@@ -54,6 +57,7 @@ public class AutonomousRobot extends Robot {
 	/**
 	 * This method is the autonomous program to place the gear on teh right peg.
 	 */
+	@Override
 	public void rightPeg() {
 
 		if (this.autoLoop < 300) {
@@ -86,13 +90,99 @@ public class AutonomousRobot extends Robot {
 	/**
 	 * This method is the autonomous program to place a gear on the center peg.
 	 */
+	@Override
 	public void centerPeg() {
-		// TODO Dariya and Erin implement this method.
+		LEDRing.set(true);
+		double ultraValue = ultrasonic.getVoltage();
+		SmartDashboard.putNumber("Autonomous Loop", autoLoop);
+		SmartDashboard.putNumber("ultrasonic", ultraValue);
+
+		if (autoLoop <= 120 && josh != 1) {
+			auton = 1;
+			moveRobotForward(.4);
+			autoLoop++;
+		}
+
+		else if (autoLoop > 120 || josh == 1) {
+			josh = 1;
+			try {
+				double[] defaultValues = new double[5];
+				defaultValues[0] = 1;
+
+				double[] GRIPlength = contourReport.getNumberArray("height", defaultValues);
+				double gripHeight = GRIPlength[0];
+				double[] centerx = contourReport.getNumberArray("centerX", defaultValues);
+				double centerx1 = centerx[0];
+				double centerx2 = centerx[1];
+				double centeravg = (centerx1 + centerx2) / 2;
+				SmartDashboard.putNumber("gripheight", gripHeight);
+
+				if (gripHeight <= 50) {
+					auton = 2;
+					moveRobotForward(.4);
+				}
+				if (centerx2 != 1) {
+					if (centeravg >= 145.0) {
+						moveRobotTurnRight(.125, .25);
+					} else if (centeravg <= 75.0) {
+						moveRobotTurnLeft(.25, .125);
+					}
+				}
+				if (auton == 2) {
+					if (getUltrasonicInches() < 2.5) {
+						moveRobotForward(0);
+						// Timer.delay(4);
+						auton = 3;
+					}
+				} else if (auton == 3) {
+					if (encoders.get() > 15) {
+						moveRobotReverse(.4);
+					} else if (encoders.get() < 15) {
+						auton = 4;
+					}
+				}
+				SmartDashboard.putNumber("ultrasonic", ultraValue);
+			} catch (ArrayIndexOutOfBoundsException e) {
+				System.out.println("Array is out of Bounds" + e);
+			}
+		} else if (auton == 4) {
+			if (navx.getAngle() < 90) {
+				moveRobotTurnLeft(.4, .4);
+			} else if (navx.getAngle() >= 90) {
+				moveRobotForward(0);
+				// encoders.reset;
+				navx.reset();
+				auton = 5;
+			}
+		} else if (auton == 5) {
+			if (encoders < 5) {
+				moveRobotForward(.5);
+			} else if (encoders >= 5) {
+				if (navx.getAngle() < 90) {
+					moveRobotTurnRight(.4, .4);
+				} else if (navx.getAngle() >= 90) {
+					moveRobotForward(0);
+					auton = 6;
+					navx.reset();
+					encoders.reset();
+				}
+			}
+		} else if (auton == 6) {
+			if (encoders < 5) {
+				moveRobotForward(.6);
+			} else {
+				moveRobotForward(0);
+			}
+		} else {
+			moveRobotForward(0);
+		}
+		SmartDashboard.putNumber("Auton Number", auton);
 	}
 
 	/**
 	 * This method is the autonomous program to place a gear on the left peg.
 	 */
+	@Override
 	public void leftPeg() {
 		if (this.autoLoop < 300) {
 			this.moveRobotForward(.5);
@@ -125,6 +215,7 @@ public class AutonomousRobot extends Robot {
 	/**
 	 * This method is the autonomous program to ??.
 	 */
+	@Override
 	public void rightHopper() {
 		// TODO Implement this method.
 	}
@@ -132,6 +223,7 @@ public class AutonomousRobot extends Robot {
 	/**
 	 * This method is the autonomous program to ??.
 	 */
+	@Override
 	public void leftHopper() {
 		// TODO Implement this method.
 	}
@@ -140,6 +232,7 @@ public class AutonomousRobot extends Robot {
 	 * This method is the autonomous program to move the robot across the
 	 * baseline.
 	 */
+	@Override
 	public void crossBaseline() {
 		// TODO Implement this method.
 	}
