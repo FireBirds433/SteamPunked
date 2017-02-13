@@ -585,12 +585,23 @@ public class Robot extends IterativeRobot {
 
 		// gear box pivot
 		boolean isGearboxUpright = uprightGearLimitSwitch.get();
-		boolean isGearboxAngled = angledGearLimitSwitch.get();
+		boolean isGearboxAngled = !angledGearLimitSwitch.get();
+		double gearboxSpeed = -xbox.getRawAxis(5) / 2;
 
-		if (xbox.getRawAxis(2) > 0 && !isGearboxUpright) {
-			gearRetrievalPivot.set(xbox.getRawAxis(2) / 2.5);
-		} else if (xbox.getRawAxis(2) < 0 && !isGearboxAngled) {
-			gearRetrievalPivot.set(-xbox.getRawAxis(2) / 2.5);
+		if (isGearboxUpright) {
+			if (xbox.getRawAxis(5) > 0) {
+				gearRetrievalPivot.set(0);
+			} else if (xbox.getRawAxis(5) < 0) {
+				gearRetrievalPivot.set(gearboxSpeed);
+			}
+		} else if (isGearboxAngled) {
+			if (xbox.getRawAxis(5) < 0) {
+				gearRetrievalPivot.set(0);
+			} else if (xbox.getRawAxis(5) > 0) {
+				gearRetrievalPivot.set(gearboxSpeed);
+			}
+		} else if (!isGearboxUpright && !isGearboxAngled) {
+			gearRetrievalPivot.set(gearboxSpeed);
 		} else {
 			gearRetrievalPivot.set(0);
 		}
