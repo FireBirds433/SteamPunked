@@ -30,7 +30,7 @@ public class AutonomousRobot extends Robot {
 			leftPeg();
 			break;
 		case 4:
-			rightHopper();
+			rightHopper(); // coming from red alliance side
 			break;
 		case 5:
 			// XXX This formerly called a method notSureYet(), I removed that
@@ -38,7 +38,7 @@ public class AutonomousRobot extends Robot {
 			DoNothing();
 			break;
 		case 6:
-			leftHopper();
+			leftHopper(); // coming from red alliance side
 			break;
 		case 7:
 			crossBaseline();
@@ -254,7 +254,23 @@ public class AutonomousRobot extends Robot {
 	 */
 	@Override
 	public void rightHopper() {
-		// TODO Implement this method.
+		if (encoder.get() < 5) { // distance in inches: 105
+			moveRobotForward(.5);
+		} else if (encoder.get() >= 5) { // reaches distance
+			auton = 1;
+		} else if (auton == 1) {
+			if (navx.getAngle() < 90) {
+				moveRobotTurnRight(.4, .4);
+			} else if (navx.getangle() >= 90) {
+				moveRobotForward(0);
+				encoders.reset();
+				auton = 2;
+			}
+		} else if (auton == 2) {
+			if (getUltrasonicInches() > 10) {
+
+			}
+		}
 	}
 
 	/**
