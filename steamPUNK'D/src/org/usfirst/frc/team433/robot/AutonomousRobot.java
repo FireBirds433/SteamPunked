@@ -97,13 +97,13 @@ public class AutonomousRobot extends Robot {
 		SmartDashboard.putNumber("Autonomous Loop", autoLoop);
 		SmartDashboard.putNumber("ultrasonic", ultraValue);
 
-		if (autoLoop <= 120 && josh != 1) {
+		if (encoders.get() <= 120 && josh != 1) {
 			auton = 1;
 			moveRobotForward(.4);
 			autoLoop++;
 		}
 
-		else if (autoLoop > 120 || josh == 1) {
+		else if (encoders.get() > 120 || josh == 1) {
 			josh = 1;
 			try {
 				double[] defaultValues = new double[5];
@@ -184,30 +184,67 @@ public class AutonomousRobot extends Robot {
 	 */
 	@Override
 	public void leftPeg() {
-		if (this.autoLoop < 300) {
+		if (encoders.get() < 300) {
 			this.moveRobotForward(.5);
-			this.autoLoop++;
 		}
 
-		if (this.autoLoop >= 300) {
+		else if (encoders.get() >= 300 || auton == 1) {
+			auton = 1;
 			try {
 				double[] centerx = this.contourReport.getNumberArray("centerx", defaultValues);
 				double centerxavg = (centerx[0] + centerx[1]) / 2;
 				double[] GRIPheight = this.contourReport.getNumberArray("height", defaultValues);
 				double height = GRIPheight[0];
-				if (centerxavg < 60) {
-					this.moveRobotTurnRight(.4, .4);
-				} else if (centerxavg >= 60 && centerxavg < 120) {
-					this.moveRobotReverse(0);
-				}
+
+				auton = 3;
+				final double gyroValue = navx.getAngle();
+
 				if (height < 40) {
-					this.moveRobotForward(.5);
+					if (centerxavg < 60) {
+						this.moveRobotTurnRight(.4, .4);
+					} else if (centerxavg >= 60 && centerxavg < 120) {
+						this.moveRobotForward(.5);
+					}
+				} else if (getUltrasonicInches() < 2.5) {
+					moveRobotForward(0);
+					auton = 4;
+					encoders.reset();
+					navx.reset();
 				} else {
 					this.moveRobotReverse(0);
+					auton = 4;
+					encoders.reset();
+					navx.reset();
 				}
 
 			} catch (ArrayIndexOutOfBoundsException e) {
 				System.out.println("Array123 is out of Bounds" + e);
+				auton = 2;
+			}
+			if (auton == 2) {
+				moveRobotTurnRight(.4, .4);
+			}
+		}
+
+		else if (auton == 4) {
+			if (encoders.get() > -5) {
+				moveRobotReverse(.5);
+			} else {
+				moveRobotReverse(0);
+				auton = 5;
+			}
+		} else if (auton == 5) {
+			if (navx.getAngle() < 45) {
+				moveRobotTurnLeft(.4, .4);
+			} else if (navx.getAngle() >= 45) {
+				moveRobotForward(0);
+				auton = 6;
+			}
+		} else if (auton == 6) {
+			if (encoders.get() < 10) {
+				moveRobotForward(.5);
+			} else if (encoders.get() >= 10) {
+				moveRobotForward(0);
 			}
 		}
 	}
