@@ -191,8 +191,10 @@ public class Robot extends IterativeRobot {
 		solenoidGearFloorRetrieval = new Solenoid(0, 2);
 		floorRetrievalLimitUp = new DigitalInput(2);
 		floorRetrievalLimitDown = new DigitalInput(3);
+
 		// autonomous
 		auton = 0;
+		josh = 0;
 		autonSwitchA = new DigitalInput(7);
 		autonSwitchB = new DigitalInput(8);
 		autonSwitchC = new DigitalInput(9);
@@ -281,7 +283,6 @@ public class Robot extends IterativeRobot {
 
 	@Override
 	public void autonomousInit() {
-		josh = 0;
 		boolean analogSwitch1 = autonSwitchA.get();
 		boolean analogSwitch2 = autonSwitchB.get();
 		boolean analogSwitch3 = autonSwitchC.get();
